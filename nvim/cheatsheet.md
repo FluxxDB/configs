@@ -37,6 +37,7 @@ ci" / ci(      change inside quotes / parentheses
 J              join line below onto this one
 ~              toggle case
 Alt-j / Alt-k  move line (or selection) down / up
+gcc            toggle comment
 
 ## Search and replace
 /text          search forward (n = next, N = previous)
