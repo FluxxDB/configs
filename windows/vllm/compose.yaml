@@ -1,0 +1,93 @@
+# Serve one model with vLLM on the Radeon RX 7900 GRE (16 GB, gfx1100) from `docker compose up`,
+# under WSL2. Models are env files in models/; one model at a time.
+#
+# Why the engine is a container here, when on the Mac (../../mac/vllm) it is a host process:
+#   * WSL hands the GPU to Linux as /dev/dxg, and AMD's ROCDXG library (installed on the host by
+#     ../setup.sh and mounted below) lets the container's ROCm reach it. So the plain vLLM ROCm
+#     image works, and no Compose provider is needed.
+#   * The image is AMD's RDNA3 (gfx110X) build. vLLM's own ROCm images target Instinct GPUs.
+#
+# Usage:
+#   docker compose --env-file models/<name>.env up -d --wait   # start; returns once the model is loaded
+#   docker compose logs -f                                     # engine + warm-up logs
+#   docker compose down                                        # stop the engine and free the VRAM
+#   (ln -s models/<name>.env .env makes that model the default, so --env-file can be dropped)
+#
+# Endpoint: http://localhost:${PORT}/v1   (OpenAI-compatible; model name = SERVED_NAME; reachable
+# from Windows too, through WSL's localhost forwarding)
+
+name: vllm
+
+services:
+  # The vLLM engine.
+  vllm:
+    image: ${VLLM_IMAGE:-rocm/vllm:rocm7.13.0_gfx110X-all_ubuntu24.04_py3.13_pytorch_2.10.0_vllm_0.19.1}
+    entrypoint: ["/bin/bash", "/serve.sh"]
+    # GPU access under WSL: the paravirtualized GPU device, Windows' DXCore library, the ROCDXG
+    # bridge with its list of supported device IDs, and the WSL build of amdsmi (vLLM asks it
+    # which GPU it's on; the image's own amdsmi can't see /dev/dxg).
+    devices:
+      - /dev/dxg
+    volumes:
+      - /usr/lib/wsl/lib/libdxcore.so:/usr/lib/libdxcore.so:ro
+      - /opt/rocm/lib/librocdxg.so:/usr/lib/librocdxg.so:ro
+      - /opt/rocm/share/rocdxg/dids.conf:/usr/share/rocdxg/dids.conf:ro
+      - /opt/rocm-wsl:/opt/rocm-wsl:ro
+      # Same path inside and out, so a local MODEL_PATH under HF_HOME works unchanged.
+      - ${HF_HOME:-${HOME}/Projects/.huggingface}:${HF_HOME:-${HOME}/Projects/.huggingface}
+      - ./scripts/serve.sh:/serve.sh:ro
+      # torch.compile and Triton kernel caches: without them every start re-compiles for minutes
+      - vllm-cache:/root/.cache
+      - triton-cache:/root/.triton
+    environment:
+      HSA_ENABLE_DXG_DETECTION: "1"
+      PYTHONPATH: /opt/rocm-wsl/share/amd_smi
+      HF_HOME: ${HF_HOME:-${HOME}/Projects/.huggingface}
+      MODEL_PATH: ${MODEL_PATH:?set MODEL_PATH - run with --env-file models/<name>.env or create .env}
+      SERVED_NAME: ${SERVED_NAME:-model}
+      CONTEXT_SIZE: ${CONTEXT_SIZE:-16384}
+      MAX_NUM_SEQS: ${MAX_NUM_SEQS:-4}
+      MAX_NUM_BATCHED_TOKENS: ${MAX_NUM_BATCHED_TOKENS:-2048}
+      GPU_MEMORY_UTILIZATION: ${GPU_MEMORY_UTILIZATION:-0.82}
+      TOOL_CALL_PARSER: ${TOOL_CALL_PARSER:-}
+      REASONING_PARSER: ${REASONING_PARSER:-}
+      VLLM_EXTRA_ARGS: ${VLLM_EXTRA_ARGS:-}
+    group_add:
+      - video
+    ipc: host
+    shm_size: 8g
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
+    ports:
+      - "127.0.0.1:${PORT:-8000}:8000"
+    # `up --wait` returns once this passes. The first start downloads the model, so allow a while.
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30m
+      start_interval: 5s
+    restart: "no"
+
+  # Sends one long warm-up prompt (first request after a start pays one-time costs), prints the
+  # endpoint, then idles so the stack shows as "running" in `docker compose ps`.
+  warmup:
+    image: curlimages/curl:latest
+    depends_on:
+      vllm:
+        condition: service_healthy
+    volumes:
+      - ./scripts/warmup.sh:/warmup.sh:ro
+    environment:
+      VLLM_URL: http://vllm:8000/v1
+      VLLM_HOST_URL: http://localhost:${PORT:-8000}/v1
+      VLLM_MODEL: ${SERVED_NAME:-model}
+      PORT: ${PORT:-8000}
+    entrypoint: ["/bin/sh", "/warmup.sh"]
+    restart: "no"
+
+volumes:
+  vllm-cache:
+  triton-cache:
