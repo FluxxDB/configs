@@ -1,70 +1,38 @@
 # configs
 
-My Neovim and tmux setup for macOS and iTerm2.
+My editor, terminal and local-LLM setup for two machines. Each machine has its
+own folder with its own `install.sh` and README.
 
-| Folder | Linked to | What it is |
+| Folder | Machine | What's in it |
 |---|---|---|
-| [`nvim/`](nvim) | `~/.config/nvim` | Neovim with lazy.nvim and the Kanagawa theme |
-| [`tmux/`](tmux) | `~/.config/tmux` | tmux with a `Ctrl-a` prefix and a Catppuccin-colored status bar |
+| [`mac/`](mac) | MacBook Pro | Neovim, tmux, vLLM (vllm-metal) for macOS and iTerm2 |
+| [`windows/`](windows) | Desktop PC | The same Neovim and tmux setup adapted for Ubuntu on WSL2, plus vLLM on ROCm in Docker |
+
+## Machines
+
+| | Mac | Windows desktop |
+|---|---|---|
+| Model | MacBook Pro | Custom desktop |
+| CPU | Apple M5 Pro | AMD Ryzen 7 7800X3D (8 cores / 16 threads) |
+| GPU | M5 Pro integrated (Metal) | AMD Radeon RX 7900 GRE, 16 GB VRAM (RDNA3, `gfx1100`) |
+| Memory | 24 GB unified | 64 GB DDR5 |
+| OS | macOS | Windows 11 + WSL2 (Ubuntu 22.04) |
+| Terminal | iTerm2 | Windows Terminal |
+| LLM serving | vllm-metal on the host, managed by `docker compose` | vLLM ROCm container reaching the GPU through WSL's `/dev/dxg` |
 
 ## Install
 
 ```bash
-brew install neovim tmux fzf ripgrep fd tree-sitter-cli
-brew install --cask font-jetbrains-mono-nerd-font
 git clone git@github.com:FluxxDB/configs.git ~/Projects/configs
-~/Projects/configs/install.sh
+~/Projects/configs/mac/install.sh       # on the Mac
+~/Projects/configs/windows/install.sh   # in WSL on the desktop
 ```
 
-`install.sh` symlinks each folder into `~/.config`. Anything already there is
-moved to `<name>.backup-<timestamp>` first, and running it again is safe.
-Start `nvim` once and lazy.nvim installs the plugins.
+Each `install.sh` symlinks that machine's `nvim/` and `tmux/` into `~/.config`.
+See [`mac/README.md`](mac/README.md) and [`windows/README.md`](windows/README.md)
+for the packages each machine needs first.
 
-### iTerm2 settings
-
-- **Font:** Settings → Profiles → Text → *JetBrainsMono Nerd Font Mono*.
-  Without a Nerd Font, file icons show up as `?` boxes.
-- **Option key:** Settings → Profiles → Keys → Left Option key → *Esc+*,
-  so `Alt-j` / `Alt-k` can move lines.
-- **Cmd-a as tmux prefix (optional):** add a key binding for ⌘A that sends hex
-  code `0x01`.
-
-## Neovim
-
-Needs Neovim 0.12+, `tree-sitter-cli` 0.26.1+ and a C compiler (Xcode Command
-Line Tools) for syntax highlighting.
-
-| Plugin | Used for |
-|---|---|
-| [lazy.nvim](https://github.com/folke/lazy.nvim) | Plugin manager |
-| [kanagawa.nvim](https://github.com/rebelot/kanagawa.nvim) | Color theme |
-| [neo-tree.nvim](https://github.com/nvim-neo-tree/neo-tree.nvim) | File explorer with Files / Buffers / Git tabs |
-| [bufferline.nvim](https://github.com/akinsho/bufferline.nvim) | Buffer tabs along the top |
-| [fzf-lua](https://github.com/ibhagwan/fzf-lua) | Fuzzy finding files, text and buffers |
-| [which-key.nvim](https://github.com/folke/which-key.nvim) | Popup hints for leader keys |
-| [blink.cmp](https://github.com/saghen/blink.cmp) | Autocompletion |
-| [mason.nvim](https://github.com/mason-org/mason.nvim) + [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) | Language servers |
-| [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter) | Syntax highlighting |
-
-The leader key is Space. `Space ?` opens the cheat sheet
-([`nvim/cheatsheet.md`](nvim/cheatsheet.md)), and `Space k` searches it along
-with every keymap.
-
-Plugin versions are pinned in `nvim/lazy-lock.json`. `:Lazy update` updates
-them (commit the lockfile afterwards), and `:Lazy restore` goes back to the
-pinned versions.
-
-## tmux
-
-- Prefix is `Ctrl-a`
-- `prefix r` reloads the config
-- Mouse support is on, and windows and panes are numbered from 1
-
-## Making changes
-
-`~/.config/nvim` and `~/.config/tmux` are symlinks into this repo, so editing
-your config edits the repo. Commit and push from here:
-
-```bash
-cd ~/Projects/configs && git add -A && git commit -m "Describe the change" && git push
-```
+> **Mac, after pulling the `mac/` + `windows/` reorganization:** the old
+> `~/.config/nvim` and `~/.config/tmux` symlinks point at `~/Projects/configs/nvim`
+> and `~/Projects/configs/tmux`, which no longer exist. Run
+> `~/Projects/configs/mac/install.sh` once to re-point them.
