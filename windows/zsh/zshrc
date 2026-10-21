@@ -121,3 +121,9 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
+# `wsl` typed in PowerShell, cmd or Win+R starts in that window's Windows folder,
+# usually the Windows profile (C:\Users\<you>) or System32. Start in the Linux home
+# instead. Starting from any other Windows folder (a project) keeps that folder.
+if [[ ${PWD:l} == /mnt/c/windows/system32 || ( ${PWD:l} == /mnt/c/users/* && ${PWD:l} != /mnt/c/users/*/* ) ]]; then
+  cd ~
+fi

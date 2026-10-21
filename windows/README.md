@@ -62,7 +62,9 @@ plugins.
     needs root, so `install.sh` also adds a few lines to `~/.bashrc` that switch
     any interactive terminal to zsh: the Start menu's WSL entry, `ssh` from the
     Mac, editor terminals. Scripts and agents' shells without a terminal keep
-    bash. Set `NO_ZSH=1` to stay in bash.
+    bash. Set `NO_ZSH=1` to stay in bash. Typing `wsl` in PowerShell, cmd or
+    Win+R opens in `~` rather than `/mnt/c/Users/ledan` (or System32); `wsl`
+    started from any other Windows folder keeps that folder.
   - **Default profile:** Ubuntu, so opening Windows Terminal gets this look.
     The Start menu's *WSL* entry opens with Windows Terminal's default look,
     not this profile's; open Windows Terminal itself instead.
