@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Install everything this folder's configs need on Ubuntu 22.04 under WSL2: Neovim and the
-# tools its config calls (fzf, ripgrep, fd, tree-sitter, a clipboard bridge), tmux, Docker
-# Engine, and ROCm + ROCDXG (+ its AMD SMI) so containers can reach the Radeon GPU through
-# WSL's /dev/dxg.
+# tools its config calls (fzf, ripgrep, fd, tree-sitter, a clipboard bridge), tmux, zsh with
+# Oh My Zsh, Docker Engine, and ROCm + ROCDXG (+ its AMD SMI) so containers can reach the
+# Radeon GPU through WSL's /dev/dxg. The Windows Terminal side is in terminal/.
 # Runs as you and calls sudo where needed. Each step checks whether it's already done, so
 # running it again is safe. Afterwards run ./install.sh to link the configs.
 set -euo pipefail
@@ -72,6 +72,20 @@ else
     . "$HOME/.cargo/env"
   fi
   cargo install --locked tree-sitter-cli
+fi
+
+step "zsh + Oh My Zsh (the Mac's shell; static zsh in ~/.local, no root needed)"
+if [ -x "$HOME/.local/bin/zsh" ]; then
+  echo "zsh already installed ($("$HOME/.local/bin/zsh" --version))"
+else
+  # romkatv/zsh-bin's installer checks the archive's hash before extracting
+  curl -fsSL https://raw.githubusercontent.com/romkatv/zsh-bin/master/install -o "$tmp/zsh-bin-install"
+  sh "$tmp/zsh-bin-install" -q -d "$HOME/.local" -e no </dev/null
+fi
+if [ -d "$HOME/.oh-my-zsh" ]; then
+  echo "Oh My Zsh already installed"
+else
+  git clone -q --depth=1 https://github.com/ohmyzsh/ohmyzsh.git "$HOME/.oh-my-zsh"
 fi
 
 step "Docker Engine"
