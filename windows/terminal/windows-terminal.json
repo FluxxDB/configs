@@ -1,5 +1,5 @@
 {
-    "//": "Windows Terminal settings that make the Ubuntu tab match the Mac's iTerm2 (mac/iterm2). Merge into %LOCALAPPDATA%\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json: the scheme goes in \"schemes\", the profile keys into the Ubuntu profile.",
+    "//": "Windows Terminal settings that make the Ubuntu tab match the Mac's iTerm2 (mac/iterm2). Merge into %LOCALAPPDATA%\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json: the scheme goes in \"schemes\", the profile keys into the Ubuntu profile, and set defaultProfile to the Ubuntu profile's guid so new windows open it.",
     "schemes": [
         {
             "name": "iTerm2 Dark (Mac)",

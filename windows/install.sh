@@ -41,3 +41,18 @@ fi
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
   echo "note: Oh My Zsh isn't installed; run ./setup.sh first"
 fi
+
+# The login shell stays bash (changing it needs root), so interactive terminals hop to
+# zsh from ~/.bashrc: the Start menu's WSL entry, ssh from the Mac, editor terminals.
+# Anything without a terminal (scripts, agents' shells) keeps bash. NO_ZSH=1 opts out.
+if ! grep -q '>>> configs/windows zsh >>>' "$HOME/.bashrc"; then
+  cat >>"$HOME/.bashrc" <<'EOF'
+
+# >>> configs/windows zsh >>>
+if [[ $- == *i* && -t 0 && -t 1 && -z ${ZSH_VERSION:-} && -z ${NO_ZSH:-} && -z ${CLAUDECODE:-} && -x $HOME/.local/bin/zsh ]]; then
+  exec "$HOME/.local/bin/zsh" -l
+fi
+# <<< configs/windows zsh <<<
+EOF
+  echo "added           the zsh hop to ~/.bashrc"
+fi

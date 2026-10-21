@@ -58,8 +58,14 @@ plugins.
   - **Colors:** the iTerm2 dark palette (`#15191f` background, `#dcdcdc` text,
     the same 16 ANSI colors), a white block cursor, bold drawn in bright colors,
     and iTerm2's 5px/2px margins.
-  - **Shell:** the tab starts zsh (the login shell stays bash, since changing it
-    needs root).
+  - **Shell:** the tab starts zsh. The login shell stays bash, since changing it
+    needs root, so `install.sh` also adds a few lines to `~/.bashrc` that switch
+    any interactive terminal to zsh: the Start menu's WSL entry, `ssh` from the
+    Mac, editor terminals. Scripts and agents' shells without a terminal keep
+    bash. Set `NO_ZSH=1` to stay in bash.
+  - **Default profile:** Ubuntu, so opening Windows Terminal gets this look.
+    The Start menu's *WSL* entry opens with Windows Terminal's default look,
+    not this profile's; open Windows Terminal itself instead.
 - **Alt key:** Windows Terminal sends Alt as Meta already, so `Alt-j` / `Alt-k`
   move lines with no setup.
 - **Memory:** `C:\Users\ledan\.wslconfig` caps the WSL VM at 56 GB of the 64 GB,
