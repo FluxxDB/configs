@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Symlink each config folder in this repo into ~/.config, so editing your live
-# config edits the repo. Anything already in the way is moved aside, not deleted.
+# Symlink the configs in this repo into place, so editing your live config
+# edits the repo. Anything already in the way is moved aside, not deleted.
 # Safe to run again.
 set -euo pipefail
 
@@ -8,15 +8,12 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 config="${XDG_CONFIG_HOME:-$HOME/.config}"
 stamp="$(date +%Y%m%d-%H%M%S)"
 
-mkdir -p "$config"
-
-for name in nvim tmux; do
-  src="$repo/$name"
-  dest="$config/$name"
+link() {
+  local src="$1" dest="$2"
 
   if [ "$(readlink "$dest" 2>/dev/null)" = "$src" ]; then
     echo "already linked  $dest"
-    continue
+    return
   fi
 
   if [ -e "$dest" ] || [ -L "$dest" ]; then
@@ -26,9 +23,20 @@ for name in nvim tmux; do
 
   ln -s "$src" "$dest"
   echo "linked          $dest -> $src"
-done
+}
+
+mkdir -p "$config"
+link "$repo/nvim" "$config/nvim"
+link "$repo/tmux" "$config/tmux"
+link "$repo/zsh/zshrc" "$HOME/.zshrc"
+link "$repo/zsh/zprofile" "$HOME/.zprofile"
 
 # tmux reads ~/.tmux.conf before ~/.config/tmux/tmux.conf, so one there would win.
 if [ -e "$HOME/.tmux.conf" ]; then
   echo "warning: ~/.tmux.conf exists and overrides tmux/tmux.conf; rename or remove it"
+fi
+
+# The zshrc expects Oh My Zsh.
+if [ ! -d "$HOME/.oh-my-zsh" ]; then
+  echo "note: Oh My Zsh isn't installed; see README.md before opening a new shell"
 fi

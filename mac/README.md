@@ -1,34 +1,53 @@
 # configs — Mac
 
-My Neovim and tmux setup for macOS and iTerm2.
+My Neovim, tmux, zsh and iTerm2 setup for macOS.
 
 | Folder | Linked to | What it is |
 |---|---|---|
 | [`nvim/`](nvim) | `~/.config/nvim` | Neovim with lazy.nvim and the Kanagawa theme |
 | [`tmux/`](tmux) | `~/.config/tmux` | tmux with a `Ctrl-a` prefix and a Catppuccin-colored status bar |
+| [`zsh/`](zsh) | `~/.zshrc`, `~/.zprofile` | Oh My Zsh with the `af-magic` prompt |
+| [`iterm2/`](iterm2) | loaded by iTerm2 | iTerm2 settings: font, colors, key bindings |
 | [`vllm/`](vllm) | — | Template for serving an MLX model with vllm-metal from `docker compose` |
 
 ## Install
 
 ```bash
 brew install neovim tmux fzf ripgrep fd tree-sitter-cli
-brew install --cask font-jetbrains-mono-nerd-font
+brew install --cask iterm2 font-jetbrains-mono-nerd-font
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended --keep-zshrc
 git clone git@github.com:FluxxDB/configs.git ~/Projects/configs
 ~/Projects/configs/mac/install.sh
 ```
 
-`install.sh` symlinks each folder into `~/.config`. Anything already there is
-moved to `<name>.backup-<timestamp>` first, and running it again is safe.
+`install.sh` symlinks `nvim/` and `tmux/` into `~/.config` and the zsh files to
+`~/.zshrc` and `~/.zprofile`. Anything already there is moved to
+`<name>.backup-<timestamp>` first, and running it again is safe.
 Start `nvim` once and lazy.nvim installs the plugins.
 
-### iTerm2 settings
+### iTerm2
 
-- **Font:** Settings → Profiles → Text → *JetBrainsMono Nerd Font Mono*.
-  Without a Nerd Font, file icons show up as `?` boxes.
-- **Option key:** Settings → Profiles → Keys → Left Option key → *Esc+*,
-  so `Alt-j` / `Alt-k` can move lines.
-- **Cmd-a as tmux prefix (optional):** add a key binding for ⌘A that sends hex
-  code `0x01`.
+In iTerm2, open Settings → General → Settings, turn on **Load settings from a
+custom folder or URL**, and pick `~/Projects/configs/mac/iterm2`. Set **Save
+changes** to *Automatically* so later tweaks land in the repo. Restart iTerm2.
+
+What the settings give you:
+
+- **Font:** *JetBrainsMonoNL Nerd Font Mono* at 26pt (the no-ligatures
+  variant). Without a Nerd Font, file icons show up as `?` boxes.
+- **Colors:** iTerm2's default palette with separate light and dark versions
+  (dark: `#15191f` background, `#dcdcdc` text), no transparency or blur.
+- **Option key:** the left Option key sends *Esc+*, so `Alt-j` / `Alt-k` can
+  move lines in Neovim.
+- **⌘A** sends `0x01` (`Ctrl-a`), the tmux prefix.
+- **Three-finger swipes** switch tabs (left/right) and windows (up/down).
+
+## zsh
+
+[Oh My Zsh](https://ohmyz.sh) with the built-in `af-magic` theme and the `git`
+plugin. `vim` runs Neovim, and `EDITOR` / `VISUAL` are set to `nvim`. The files
+also set up machine-specific paths (Homebrew, Docker, OpenJDK, LM Studio, the
+Hugging Face cache), so check them on a new machine.
 
 ## Neovim
 
@@ -63,8 +82,9 @@ pinned versions.
 
 ## Making changes
 
-`~/.config/nvim` and `~/.config/tmux` are symlinks into this repo, so editing
-your config edits the repo. Commit and push from here:
+`~/.config/nvim`, `~/.config/tmux`, `~/.zshrc` and `~/.zprofile` are symlinks
+into this repo, and iTerm2 saves its settings here, so editing your config edits
+the repo. Commit and push from here:
 
 ```bash
 cd ~/Projects/configs && git add -A && git commit -m "Describe the change" && git push

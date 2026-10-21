@@ -5,7 +5,7 @@ own folder with its own `install.sh` and README.
 
 | Folder | Machine | What's in it |
 |---|---|---|
-| [`mac/`](mac) | MacBook Pro | Neovim, tmux, vLLM (vllm-metal) for macOS and iTerm2 |
+| [`mac/`](mac) | MacBook Pro | Neovim, tmux, zsh, iTerm2 settings and vLLM (vllm-metal) for macOS |
 | [`windows/`](windows) | Desktop PC | The same Neovim and tmux setup adapted for Ubuntu on WSL2, plus vLLM on ROCm in Docker |
 
 ## Machines
@@ -28,7 +28,7 @@ git clone git@github.com:FluxxDB/configs.git ~/Projects/configs
 ~/Projects/configs/windows/install.sh   # in WSL on the desktop
 ```
 
-Each `install.sh` symlinks that machine's `nvim/` and `tmux/` into `~/.config`.
+Each `install.sh` symlinks that machine's configs into place.
 See [`mac/README.md`](mac/README.md) and [`windows/README.md`](windows/README.md)
 for the packages each machine needs first.
 
