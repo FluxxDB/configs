@@ -7,7 +7,7 @@ vLLM serving on the Radeon RX 7900 GRE.
 | Folder | Linked to | What it is |
 |---|---|---|
 | [`nvim/`](nvim) | `~/.config/nvim` | Neovim with lazy.nvim and the Kanagawa theme (same plugins and pinned versions as the Mac) |
-| [`tmux/`](tmux) | `~/.config/tmux` | tmux with a `Ctrl-a` prefix and a Catppuccin-colored status bar; copies go to the Windows clipboard |
+| [`tmux/`](tmux) | `~/.config/tmux` | tmux with an `Alt-a` prefix and a Catppuccin-colored status bar; copies go to the Windows clipboard |
 | [`zsh/`](zsh) | `~/.zshrc`, `~/.zprofile` | Oh My Zsh with the `af-magic` prompt, like the Mac |
 | [`terminal/`](terminal) | Windows Terminal settings | The Mac's iTerm2 font, size and colors for the Ubuntu tab |
 | [`vllm/`](vllm) | — | Template for serving a model with vLLM on ROCm in Docker, through WSL's GPU bridge |
@@ -91,7 +91,7 @@ with every keymap.
 
 ## tmux
 
-- Prefix is `Ctrl-a`
+- Prefix is `Alt-a`
 - `prefix r` reloads the config
 - Mouse support is on, and windows and panes are numbered from 1
 - Mouse-drag, double-click and triple-click copies go to the Windows clipboard
