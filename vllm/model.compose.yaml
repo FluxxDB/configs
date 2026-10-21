@@ -1,0 +1,65 @@
+# TEMPLATE — serve one MLX model with vLLM on an Apple-silicon Mac from `docker compose up`.
+# Copy to <model>.compose.yaml, set `name:` below to <model>, and point it at a models/<name>.env.
+#
+# Why the engine is a host process and not a container:
+#   * Containers on macOS cannot use the Apple GPU, and vLLM's CPU backend has no 4-bit support on
+#     ARM, so large models cannot run inside a container on a small Mac.
+#   * Docker Model Runner's own vLLM-for-macOS backend is an old vllm-metal that forbids most vLLM
+#     flags (no --reasoning-parser / --tool-call-parser).
+#   * The Homebrew vllm-metal (brew install vllm-project/vllm-metal/vllm-metal) is correct and fast.
+#     The `vllm` service below is a Compose *provider* (./provider/docker-vllmmetal) that
+#     starts/stops that engine with the flags from the selected env file and tells the containers
+#     where it listens.
+#
+# Usage:
+#   docker compose -f <model>.compose.yaml --env-file models/<name>.env up -d   # start (or symlink the env file to .env)
+#   docker compose -f <model>.compose.yaml logs -f                              # follow logs (engine log = vllm-log service)
+#   docker compose -f <model>.compose.yaml down                                 # stops the engine too
+#
+# Endpoint: http://localhost:${PORT}/v1   (OpenAI-compatible; model name = SERVED_NAME)
+
+# Compose project name; also names the engine's state dir (~/.local/state/docker-vllmmetal/<name>/vllm).
+name: model
+
+services:
+  # The vLLM engine (vllm-metal, Metal GPU) — a host process managed by the provider plugin.
+  vllm:
+    provider:
+      type: ./provider/docker-vllmmetal
+      options:
+        model: ${MODEL_PATH:?set MODEL_PATH - run with --env-file models/<name>.env or create .env}
+        served-name: ${SERVED_NAME:-model}
+        port: ${PORT:-8000}
+        max-model-len: ${CONTEXT_SIZE:-16384}
+        max-num-seqs: ${MAX_NUM_SEQS:-4}
+        max-num-batched-tokens: ${MAX_NUM_BATCHED_TOKENS:-1024}
+        gpu-memory-utilization: ${GPU_MEMORY_UTILIZATION:-0.90}
+        tool-call-parser: ${TOOL_CALL_PARSER:-}
+        reasoning-parser: ${REASONING_PARSER:-}
+        extra-args: ${VLLM_EXTRA_ARGS:-}
+        hf-home: ${HF_HOME:-${HOME}/Projects/.huggingface}
+
+  # Sends one long warm-up prompt (first request after a start pays one-time costs), prints the
+  # endpoint, then idles so the stack shows as "running" in `docker compose ps`.
+  warmup:
+    image: curlimages/curl:latest
+    depends_on:
+      - vllm
+    volumes:
+      - ./scripts/warmup.sh:/warmup.sh:ro
+    environment:
+      PORT: ${PORT:-8000}
+    entrypoint: ["/bin/sh", "/warmup.sh"]
+    restart: "no"
+
+  # Streams the vLLM engine's own log (a host file, since the engine is a host process) into
+  # compose, so `docker compose up` / `docker compose logs -f` show it next to the other services.
+  # The default path must match `name:` above.
+  vllm-log:
+    image: curlimages/curl:latest
+    depends_on:
+      - vllm
+    volumes:
+      - ${VLLM_STATE_DIR:-${HOME}/.local/state/docker-vllmmetal/model/vllm}:/engine:ro
+    entrypoint: ["/bin/sh", "-c", "tail -n 40 -F /engine/vllm.log"]
+    restart: "no"

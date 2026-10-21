@@ -1,0 +1,185 @@
+#!/bin/bash
+# Docker Compose provider plugin: runs the Homebrew vllm-metal `vllm serve` as a host process (the
+# only place on a Mac where a vLLM engine can reach the Metal GPU) and hands its endpoint to the
+# containers of the compose project. Plain bash 3.2 (macOS default), no extra dependencies.
+#
+# Compose calls:   docker-vllmmetal compose --project-name <P> up --model=... [--k=v ...] <service>
+#                  docker-vllmmetal compose --project-name <P> down <service>
+#                  docker-vllmmetal compose --project-name <P> stop <service>
+#                  docker-vllmmetal compose metadata
+# and reads JSON lines {"type":"info|error|setenv|debug","message":"..."} from stdout.
+# Protocol: https://github.com/docker/compose/blob/main/docs/extension.md
+set -u
+
+VLLM_BIN="${VLLM_BIN:-/opt/homebrew/bin/vllm}"
+STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/docker-vllmmetal"
+
+json() { local m="$2"; m="${m//\\/\\\\}"; m="${m//\"/\\\"}"; m="${m//$'\n'/ }"; printf '{"type":"%s","message":"%s"}\n' "$1" "$m"; }
+info()  { json info "$1"; }
+debug() { json debug "$1"; }
+die()   { json error "$1"; exit 1; }
+
+case "${1:-}" in
+  docker-cli-plugin-metadata)
+    printf '%s\n' '{"SchemaVersion":"0.1.0","Vendor":"local","Version":"0.1.0","ShortDescription":"Compose provider: vLLM on Apple silicon (vllm-metal host process)"}'
+    exit 0 ;;
+  compose) shift ;;
+  *) echo "usage: docker-vllmmetal compose [--project-name NAME] (up|down|stop|metadata) [--option=value ...] SERVICE" >&2; exit 2 ;;
+esac
+
+# ---- parse: [--project-name NAME] CMD [--k=v | --k v]... SERVICE -------------------------------
+PROJECT=""; CMD=""; SERVICE=""
+o_model=""; o_served_name="model"; o_host="127.0.0.1"; o_port="8000"; o_max_model_len=""; o_max_num_seqs=""
+o_max_num_batched_tokens=""; o_gpu_memory_utilization=""; o_tool_call_parser=""; o_reasoning_parser=""
+o_extra_args=""; o_hf_home=""; o_startup_timeout="900"
+setopt() { # key value
+  case "$1" in
+    model) o_model="$2" ;;                     served-name) o_served_name="$2" ;;
+    host) o_host="$2" ;;                       port) o_port="$2" ;;
+    max-model-len) o_max_model_len="$2" ;;     max-num-seqs) o_max_num_seqs="$2" ;;
+    max-num-batched-tokens) o_max_num_batched_tokens="$2" ;;
+    gpu-memory-utilization) o_gpu_memory_utilization="$2" ;;
+    tool-call-parser) o_tool_call_parser="$2" ;; reasoning-parser) o_reasoning_parser="$2" ;;
+    extra-args) o_extra_args="$2" ;;           hf-home) o_hf_home="$2" ;;
+    startup-timeout) o_startup_timeout="$2" ;;
+    *) debug "ignoring unknown option --$1" ;;
+  esac
+}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --project-name=*) PROJECT="${1#*=}"; shift ;;
+    --project-name)   PROJECT="${2:-}"; shift 2 ;;
+    up|down|stop|metadata) if [ -z "$CMD" ]; then CMD="$1"; else SERVICE="$1"; fi; shift ;;
+    --*=*) k="${1#--}"; setopt "${k%%=*}" "${k#*=}"; shift ;;
+    --*)   k="${1#--}"; if [ $# -ge 2 ] && [ "${2#--}" = "$2" ]; then setopt "$k" "$2"; shift 2; else setopt "$k" "true"; shift; fi ;;
+    *)     SERVICE="$1"; shift ;;
+  esac
+done
+
+if [ "$CMD" = "metadata" ]; then
+  cat <<'JSON'
+{"description":"vLLM (vllm-metal) on the macOS host, managed by docker compose",
+ "up":{"parameters":[
+  {"name":"model","description":"local model directory or Hugging Face repo id (MLX 4/8-bit safetensors)","required":true,"type":"string"},
+  {"name":"served-name","description":"model name clients use in requests","required":false,"type":"string","default":"model"},
+  {"name":"host","description":"bind address","required":false,"type":"string","default":"127.0.0.1"},
+  {"name":"port","description":"TCP port","required":false,"type":"integer","default":"8000"},
+  {"name":"max-model-len","description":"vLLM --max-model-len","required":false,"type":"integer"},
+  {"name":"max-num-seqs","description":"vLLM --max-num-seqs","required":false,"type":"integer"},
+  {"name":"max-num-batched-tokens","description":"vLLM --max-num-batched-tokens","required":false,"type":"integer"},
+  {"name":"gpu-memory-utilization","description":"fraction of the GPU working set for weights+KV","required":false,"type":"string"},
+  {"name":"tool-call-parser","description":"vLLM --tool-call-parser (enables auto tool choice); empty disables","required":false,"type":"string"},
+  {"name":"reasoning-parser","description":"vLLM --reasoning-parser; empty disables","required":false,"type":"string"},
+  {"name":"extra-args","description":"extra `vllm serve` arguments (whitespace-split)","required":false,"type":"string"},
+  {"name":"hf-home","description":"HF_HOME for cache/downloads","required":false,"type":"string"},
+  {"name":"startup-timeout","description":"seconds to wait for /health","required":false,"type":"integer","default":"900"}]},
+ "down":{"parameters":[]},
+ "stop":{"parameters":[]}}
+JSON
+  exit 0
+fi
+
+[ -n "$PROJECT" ] || die "--project-name is required"
+[ -n "$SERVICE" ] || SERVICE="vllm"
+STATE="$STATE_ROOT/$PROJECT/$SERVICE"; mkdir -p "$STATE" || die "cannot create $STATE"
+PIDFILE="$STATE/pid"; LOGFILE="$STATE/vllm.log"; CMDFILE="$STATE/cmdline"
+HOST="$o_host"; PORT="$o_port"
+
+alive()   { [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; }
+healthy() { curl -fsS -m 3 -o /dev/null "http://${HOST}:${PORT}/health" 2>/dev/null; }
+descendants() { local p c; for p in "$@"; do for c in $(pgrep -P "$p" 2>/dev/null); do echo "$c"; descendants "$c"; done; done; }
+
+stop_server() {
+  if alive; then
+    local pid; pid=$(cat "$PIDFILE"); local all; all="$pid $(descendants "$pid" | tr '\n' ' ')"
+    info "stopping vllm (pid $pid)"
+    kill -TERM $all 2>/dev/null
+    for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+    kill -KILL $all 2>/dev/null; sleep 1
+    info "vllm stopped"
+  else
+    info "vllm is not running"
+  fi
+  rm -f "$PIDFILE"
+}
+
+case "$CMD" in
+  down|stop) stop_server; exit 0 ;;
+  up) ;;
+  *) die "unknown command '$CMD'" ;;
+esac
+
+# ---- up ------------------------------------------------------------------------------------------
+MODEL="$o_model"; [ -n "$MODEL" ] || die "option 'model' is required"
+NAME="$o_served_name"
+[ -x "$VLLM_BIN" ] || die "vllm not found at $VLLM_BIN (brew install vllm-project/vllm-metal/vllm-metal)"
+case "$MODEL" in
+  "~"*) MODEL="$HOME${MODEL#\~}" ;;
+esac
+case "$MODEL" in
+  /*|./*) [ -d "$MODEL" ] || die "model directory not found: $MODEL" ;;
+esac
+
+ARGS="serve $MODEL --host $HOST --port $PORT --served-model-name $NAME"
+[ -n "$o_max_model_len" ]          && ARGS="$ARGS --max-model-len $o_max_model_len"
+[ -n "$o_max_num_seqs" ]           && ARGS="$ARGS --max-num-seqs $o_max_num_seqs"
+[ -n "$o_max_num_batched_tokens" ] && ARGS="$ARGS --max-num-batched-tokens $o_max_num_batched_tokens"
+[ -n "$o_gpu_memory_utilization" ] && ARGS="$ARGS --gpu-memory-utilization $o_gpu_memory_utilization"
+[ -n "$o_tool_call_parser" ]       && ARGS="$ARGS --enable-auto-tool-choice --tool-call-parser $o_tool_call_parser"
+[ -n "$o_reasoning_parser" ]       && ARGS="$ARGS --reasoning-parser $o_reasoning_parser"
+[ -n "$o_extra_args" ]             && ARGS="$ARGS $o_extra_args"
+export HF_HOME="${o_hf_home:-${HF_HOME:-$HOME/.cache/huggingface}}"
+if [ -z "${HF_HUB_CACHE:-}" ]; then
+  if [ -d "$HF_HOME/models" ] && [ ! -d "$HF_HOME/hub" ]; then export HF_HUB_CACHE="$HF_HOME/models"; else export HF_HUB_CACHE="$HF_HOME/hub"; fi
+fi
+TIMEOUT="$o_startup_timeout"
+CMDLINE="$VLLM_BIN $ARGS | HF_HOME=$HF_HOME"
+
+emit_env() {
+  json setenv "URL=http://host.docker.internal:${PORT}/v1"
+  json setenv "HOST_URL=http://${HOST}:${PORT}/v1"
+  json setenv "MODEL=${NAME}"
+  json setenv "LOG=${LOGFILE}"
+}
+
+if alive; then
+  if [ "$(cat "$CMDFILE" 2>/dev/null)" = "$CMDLINE" ] && healthy; then
+    info "vllm already running (pid $(cat "$PIDFILE")) at http://${HOST}:${PORT}/v1 — model '${NAME}'"
+    emit_env; exit 0
+  fi
+  info "vllm is running with a different configuration; restarting it"
+  stop_server
+fi
+healthy && die "something else already answers on http://${HOST}:${PORT}/health — stop it or change PORT"
+
+info "starting: vllm $ARGS"
+debug "HF_HOME=$HF_HOME HF_HUB_CACHE=$HF_HUB_CACHE log=$LOGFILE"
+: > "$LOGFILE"
+# Background ONLY the nohup command (a `cd && nohup … &` list would leave an intermediate shell
+# holding Compose's stdout pipe open, and `docker compose up` would never return).
+cd "$STATE" || die "cannot cd to $STATE"
+# shellcheck disable=SC2086
+nohup "$VLLM_BIN" $ARGS </dev/null >>"$LOGFILE" 2>&1 &
+echo $! > "$PIDFILE"
+disown 2>/dev/null || true
+cd - >/dev/null || true
+echo "$CMDLINE" > "$CMDFILE"
+sleep 1
+alive || die "vllm exited immediately — $(tail -n 5 "$LOGFILE" | tr '\n' ' ' | cut -c1-400)"
+
+start=$(date +%s); el=0
+until healthy; do
+  alive || die "vllm exited during start-up (log: $LOGFILE): $(grep -E 'Error|error' "$LOGFILE" | tail -n 2 | tr '\n' ' ' | cut -c1-400)"
+  el=$(( $(date +%s) - start ))
+  if [ "$el" -ge "$TIMEOUT" ]; then stop_server; die "vllm did not become healthy within ${TIMEOUT}s (log: $LOGFILE)"; fi
+  if [ $(( el % 10 )) -eq 0 ]; then
+    last=$(grep -E "Loading|loaded|KV cache size|Maximum concurrency|wired|Metal memory|init engine|Starting" "$LOGFILE" | tail -n 1 | sed -E 's/^\([^)]*\) //; s/^INFO [0-9: -]+\[[^]]*\] //' | cut -c1-110)
+    info "loading model… ${el}s${last:+ — }${last}"
+  fi
+  sleep 2
+done
+kv=$(grep -E "KV cache size" "$LOGFILE" | tail -n 1 | sed -E 's/.*(KV cache size: .*)/\1/' | cut -c1-120)
+info "vllm ready in $(( $(date +%s) - start ))s at http://${HOST}:${PORT}/v1 — model '${NAME}'${kv:+ — $kv}"
+info "engine log: $LOGFILE"
+emit_env
+exit 0
