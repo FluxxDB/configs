@@ -106,7 +106,7 @@ alias vim=nvim
 export EDITOR=nvim
 export VISUAL=nvim
 
-# Hugging Face cache location (shared with windows/vllm)
+# Hugging Face cache location (shared with ~/Projects/vllm-serve)
 export HF_HOME="$HOME/Projects/.huggingface"
 
 # ROCm tools on PATH; ROCm before 7.13 only finds the GPU through WSL's /dev/dxg

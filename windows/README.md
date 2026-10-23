@@ -2,7 +2,7 @@
 
 The Neovim, tmux, zsh and terminal setup from [`../mac`](../mac), adapted for
 Ubuntu 22.04 on WSL2 and Windows Terminal so it looks the same as the Mac, plus
-vLLM serving on the Radeon RX 7900 GRE.
+the templates for serving vLLM on the Radeon RX 7900 GRE.
 
 | Folder | Linked to | What it is |
 |---|---|---|
@@ -10,7 +10,7 @@ vLLM serving on the Radeon RX 7900 GRE.
 | [`tmux/`](tmux) | `~/.config/tmux` | tmux with an `Alt-a` prefix and a Catppuccin-colored status bar; copies go to the Windows clipboard |
 | [`zsh/`](zsh) | `~/.zshrc`, `~/.zprofile` | Oh My Zsh with the `af-magic` prompt, like the Mac |
 | [`terminal/`](terminal) | Windows Terminal settings | The Mac's iTerm2 font, size and colors for the Ubuntu tab |
-| [`vllm/`](vllm) | — | Template for serving a model with vLLM on ROCm in Docker, through WSL's GPU bridge |
+| [`vllm/`](vllm) | copied to `~/Projects/vllm-serve` | Templates for serving a model with vLLM on ROCm in Docker, through WSL's GPU bridge |
 
 ## Install
 
@@ -101,7 +101,9 @@ with every keymap.
 
 ## vLLM
 
-See [`vllm/README.md`](vllm/README.md).
+The working setup lives in its own project, `~/Projects/vllm-serve`, and runs from there with
+`docker compose up -d --wait`. [`vllm/`](vllm) only holds the templates a new machine creates it
+from; [`vllm/README.md`](vllm/README.md) has the steps, model choices and how the GPU bridge works.
 
 ## Making changes
 
