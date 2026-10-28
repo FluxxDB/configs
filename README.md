@@ -6,7 +6,7 @@ own folder with its own `install.sh` and README.
 | Folder | Machine | What's in it |
 |---|---|---|
 | [`mac/`](mac) | MacBook Pro | Neovim, tmux, zsh, iTerm2 settings and vLLM (vllm-metal) for macOS |
-| [`windows/`](windows) | Desktop PC | The same Neovim and tmux setup adapted for Ubuntu on WSL2, plus vLLM on ROCm in Docker |
+| [`windows/`](windows) | Desktop PC | The same Neovim and tmux setup adapted for Ubuntu on WSL2, plus a template for vLLM on ROCm in Docker |
 
 ## Machines
 

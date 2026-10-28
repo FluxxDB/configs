@@ -1,0 +1,39 @@
+{
+    "//": "Windows Terminal settings that make the Ubuntu tab match the Mac's iTerm2 (mac/iterm2). Merge into %LOCALAPPDATA%\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json: the scheme goes in \"schemes\", the profile keys into the Ubuntu profile, and set defaultProfile to the Ubuntu profile's guid so new windows open it.",
+    "schemes": [
+        {
+            "name": "iTerm2 Dark (Mac)",
+            "background": "#15191F",
+            "foreground": "#DCDCDC",
+            "cursorColor": "#FFFFFF",
+            "selectionBackground": "#B3D7FF",
+            "black": "#14191E",
+            "red": "#B43C2A",
+            "green": "#00C200",
+            "yellow": "#C7C400",
+            "blue": "#2744C7",
+            "purple": "#C040BE",
+            "cyan": "#00C5C7",
+            "white": "#C7C7C7",
+            "brightBlack": "#686868",
+            "brightRed": "#DD7975",
+            "brightGreen": "#58E790",
+            "brightYellow": "#ECE100",
+            "brightBlue": "#A7ABF2",
+            "brightPurple": "#E17EE1",
+            "brightCyan": "#60FDFF",
+            "brightWhite": "#FFFFFF"
+        }
+    ],
+    "ubuntuProfile": {
+        "colorScheme": "iTerm2 Dark (Mac)",
+        "commandline": "wsl.exe -d Ubuntu --cd ~ --exec /home/soybean/.local/bin/zsh -l",
+        "cursorShape": "filledBox",
+        "font": {
+            "face": "JetBrainsMonoNL Nerd Font Mono",
+            "size": 19.5
+        },
+        "intenseTextStyle": "all",
+        "padding": "5, 2"
+    }
+}

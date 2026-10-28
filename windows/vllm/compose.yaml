@@ -1,21 +1,31 @@
-# Serve one model with vLLM on the Radeon RX 7900 GRE (16 GB, gfx1100) from `docker compose up`,
-# under WSL2. Models are env files in models/; one model at a time.
+# TEMPLATE — copied to ~/Projects/vllm-serve/compose.yaml together with scripts/ (see README.md);
+# run it from there, not from this repo.
 #
-# Why the engine is a container here, when on the Mac (../../mac/vllm) it is a host process:
+# Serve one model with vLLM on the Radeon RX 7900 GRE (16 GB, gfx1100) from `docker compose up`,
+# under WSL2. Models are env files in models/; .env (a symlink to one of them) is the default.
+# One model at a time.
+#
+# Made from the template in ~/Projects/configs/windows/vllm; the host side (ROCm, ROCDXG, the WSL
+# amdsmi in /opt/rocm-wsl, Docker) comes from ~/Projects/configs/windows/setup.sh.
+#
+# Why the engine is a container here, when on the Mac (~/Projects/configs/mac/vllm) it is a host
+# process:
 #   * WSL hands the GPU to Linux as /dev/dxg, and AMD's ROCDXG library (installed on the host by
-#     ../setup.sh and mounted below) lets the container's ROCm reach it. So the plain vLLM ROCm
+#     setup.sh and mounted below) lets the container's ROCm reach it. So the plain vLLM ROCm
 #     image works, and no Compose provider is needed.
 #   * The image is AMD's RDNA3 (gfx110X) build. vLLM's own ROCm images target Instinct GPUs.
 #
 # Usage:
-#   docker compose --env-file models/<name>.env up -d --wait   # start; returns once the model is loaded
+#   docker compose up -d --wait                                # start the .env model; returns once it is loaded
+#   docker compose --env-file models/<name>.env up -d --wait   # start another model
 #   docker compose logs -f                                     # engine + warm-up logs
 #   docker compose down                                        # stop the engine and free the VRAM
-#   (ln -s models/<name>.env .env makes that model the default, so --env-file can be dropped)
 #
 # Endpoint: http://localhost:${PORT}/v1   (OpenAI-compatible; model name = SERVED_NAME; reachable
 # from Windows too, through WSL's localhost forwarding)
 
+# The project name also names the cache volumes below (vllm_vllm-cache, vllm_triton-cache). Keep
+# it: a new name means new, empty volumes and minutes of re-compiling on the next start.
 name: vllm
 
 services:

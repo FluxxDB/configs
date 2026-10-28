@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runs inside the `vllm` container: starts `vllm serve` with the flags from the selected
 # models/<name>.env (compose.yaml passes them in as environment variables), the same way the Mac's
-# provider (mac/vllm/provider/docker-vllmmetal) builds its command line.
+# provider (~/Projects/configs/mac/vllm/provider/docker-vllmmetal) builds its command line.
 set -euo pipefail
 
 args=(serve "${MODEL_PATH:?MODEL_PATH not set}" --host 0.0.0.0 --port 8000 --served-model-name "${SERVED_NAME:-model}")

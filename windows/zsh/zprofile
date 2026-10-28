@@ -1,0 +1,3 @@
+# zsh is a static build in ~/.local (no root needed), and the Tailscale CLI wrapper
+# lives there too, so ~/.local/bin goes first.
+export PATH="$HOME/.local/bin:$PATH"

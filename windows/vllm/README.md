@@ -1,28 +1,73 @@
 # vllm — template for serving one model with vLLM on the RX 7900 GRE under WSL2
 
+Templates only, like [`../../mac/vllm`](../../mac/vllm). Nothing runs from this folder. The working
+setup lives in its own project, `~/Projects/vllm-serve`, which is made from these files and is where
+you run `docker compose`, add model env files and pick the default model.
+
 The engine is AMD's RDNA3 (gfx110X) build of vLLM in a container. It reaches the GPU through WSL's
 `/dev/dxg` and the ROCDXG bridge that [`../setup.sh`](../setup.sh) installs, so `docker compose up`
-/ `down` start and stop it. One model at a time. This is the WSL counterpart of
-[`../../mac/vllm`](../../mac/vllm), where the engine has to be a host process because macOS
-containers can't reach the GPU.
+/ `down` start and stop it. One model at a time. This is the WSL counterpart of the Mac setup, where
+the engine has to be a host process because macOS containers can't reach the GPU.
 
-## Add a model
+| File | Copied to | What it is |
+|---|---|---|
+| [`compose.yaml`](compose.yaml) | `~/Projects/vllm-serve/compose.yaml` | The `vllm` engine container and a `warmup` container |
+| [`scripts/serve.sh`](scripts/serve.sh) | `~/Projects/vllm-serve/scripts/` | Builds the `vllm serve` command line from the env file |
+| [`scripts/warmup.sh`](scripts/warmup.sh) | `~/Projects/vllm-serve/scripts/` | Sends one prompt after start-up, then prints the endpoint |
+| [`models/model.env`](models/model.env) | `~/Projects/vllm-serve/models/<name>.env` | One model's settings, with every option explained |
 
-1. Pick a checkpoint that fits: 16 GB of VRAM, minus some for the Windows desktop, has to hold the
-   weights and the KV cache, so ~10 GB of weights is the practical ceiling. RDNA3 has no FP8/FP4
-   hardware, so use bf16, AWQ, GPTQ or compressed-tensors W4A16 checkpoints, not FP8/NVFP4/MXFP4.
-2. `cp models/model.env models/<name>.env` and set `MODEL_PATH` (a Hugging Face repo id, downloaded
-   into `HF_HOME` on first start, or a local directory under it), `SERVED_NAME` and the parsers.
-3. Optionally `ln -s models/<name>.env .env` to make it the default (`.env` is gitignored).
+## Set up a new machine
+
+Run [`../setup.sh`](../setup.sh) first: it installs Docker Engine, ROCm, ROCDXG and the WSL build of
+amdsmi in `/opt/rocm-wsl`, which `compose.yaml` mounts into the container, and sets `HF_HOME`.
+
+If `~/Projects/vllm-serve` is already a GitHub repo, clone it instead. Otherwise create it from the
+templates:
 
 ```bash
-docker compose --env-file models/<name>.env up -d --wait   # -> http://localhost:8000/v1
-docker compose logs -f                                     # engine + warm-up logs
-docker compose down                                        # stops the engine, frees the VRAM
+t=~/Projects/configs/windows/vllm
+mkdir -p ~/Projects/vllm-serve/models
+cp -r "$t/compose.yaml" "$t/scripts" ~/Projects/vllm-serve/
+cp "$t/models/model.env" ~/Projects/vllm-serve/models/<name>.env   # then fill it in, see below
+cd ~/Projects/vllm-serve
+ln -s models/<name>.env .env                                       # the default model
+docker compose up -d --wait                                        # -> http://localhost:8000/v1
+docker compose logs -f                                             # engine + warm-up logs
+docker compose down                                                # stops the engine, frees the VRAM
 ```
 
-The default model is [`models/qwen3.5-9b.env`](models/qwen3.5-9b.env): Qwen3.5-9B at 4 bits, text
-only, with Qwen's tool-call and reasoning parsers. Test the endpoint (it works from Windows too):
+Keep `name: vllm` in `compose.yaml`: the compose project name also names the torch.compile and
+Triton cache volumes (`vllm_vllm-cache`, `vllm_triton-cache`). Model weights download into
+`HF_HOME` (`~/Projects/.huggingface`) on the first start. `up --wait` waits up to 30 minutes for the
+health check, which covers that download.
+
+## Pick a model
+
+1. It has to fit: 16 GB of VRAM, minus some for the Windows desktop, has to hold the weights and the
+   KV cache, so ~10 GB of weights is the practical ceiling. RDNA3 has no FP8/FP4 hardware, so use
+   bf16, AWQ, GPTQ or compressed-tensors W4A16 checkpoints, not FP8/NVFP4/MXFP4.
+2. In its `models/<name>.env`, set `MODEL_PATH` (a Hugging Face repo id, or a local directory under
+   `HF_HOME`), `SERVED_NAME` and the parsers.
+3. Run it with `docker compose --env-file models/<name>.env up -d --wait`, or `ln -sfn` it to `.env`
+   to make it the default.
+
+Known good on this card (the default in `~/Projects/vllm-serve`): Qwen3.5-9B at 4 bits, text only.
+These lines in a copy of `model.env`, with everything else left as it is:
+
+```bash
+MODEL_PATH=cyankiwi/Qwen3.5-9B-AWQ-4bit
+SERVED_NAME=qwen3.5-9b
+CONTEXT_SIZE=32768
+TOOL_CALL_PARSER=qwen3_coder
+REASONING_PARSER=qwen3
+VLLM_EXTRA_ARGS=--language-model-only --dtype float16
+```
+
+It gives 7.9 GiB of weights, ~24–27k tokens of KV cache, ~50 tokens/s for one request, and ~3
+minutes from `up` to healthy (~4.5 the very first time, while torch.compile and Triton fill their
+cache volumes). `--language-model-only` skips the vision encoder to free VRAM for the KV cache.
+Thinking is on by default and can be long; send `"chat_template_kwargs": {"enable_thinking": false}`
+for direct answers. Test the endpoint (it works from Windows too):
 
 ```bash
 curl -s http://localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -d '{
@@ -31,11 +76,6 @@ curl -s http://localhost:8000/v1/chat/completions -H 'Content-Type: application/
   "max_tokens": 400
 }' | jq -r '.choices[0].message.content'
 ```
-
-With Qwen3.5-9B: 7.9 GiB of weights, ~24–27k tokens of KV cache, ~50 tokens/s for one request, and
-~3 minutes from `up` to healthy (~4.5 the very first time, while torch.compile and Triton fill
-their caches, which live in the `vllm-cache` / `triton-cache` volumes). Thinking is on by default
-and can be long; send `"chat_template_kwargs": {"enable_thinking": false}` for direct answers.
 
 ## Tuning
 
@@ -49,7 +89,7 @@ Qwen3.5 uses hybrid attention (most layers are Gated DeltaNet with a fixed-size 
 cache per token is small and long contexts are cheap.
 
 int4 kernels on ROCm: vLLM has Conch (group size 128, bf16 or fp16) and Exllama (any group size,
-fp16 only). A checkpoint with another group size, like the default model's 32, needs
+fp16 only). A checkpoint with another group size, like Qwen3.5-9B-AWQ's 32, needs
 `--dtype float16`.
 
 ## How the WSL GPU access works
@@ -73,7 +113,11 @@ fp16 only). A checkpoint with another group size, like the default model's 32, n
   listed, update the Windows AMD driver, reboot Windows, and re-run `../setup.sh`.
 - `Free memory on device ... is less than desired GPU memory utilization`: something else on
   Windows is using VRAM; lower `GPU_MEMORY_UTILIZATION`.
-- The first start downloads the model into `HF_HOME` (`~/Projects/.huggingface`); `up --wait` waits
-  up to 30 minutes for the health check.
 - To try a different vLLM build, set `VLLM_IMAGE` in the env file. AMD publishes RDNA3 images as
   `rocm/vllm:*_gfx110X-*` and `rocm/vllm-dev:*_navi_*`.
+
+## Changing the templates
+
+Fixes found while running `~/Projects/vllm-serve` (in `compose.yaml`, the scripts, or a better
+default in an env file) belong here too, so the next machine gets them. `compose.yaml` here is the
+working one plus the `TEMPLATE` lines at the top.
