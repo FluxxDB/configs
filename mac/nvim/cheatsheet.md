@@ -51,6 +51,7 @@ gcc            toggle comment
 :wq or ZZ      save and quit
 Shift-h / Shift-l  previous / next buffer tab
 :bd            close current buffer
+Space d        close current buffer, keep the window
 Space bo       close all other buffers
 Space bp       pin buffer
 
@@ -63,6 +64,7 @@ Space fh       search help
 
 ## Explorer (neo-tree)
 Space e        toggle file explorer
+Enter          (in tree) open file, stay in the tree
 Space be       explorer on the Buffers tab
 Space ge       explorer on the Git tab
 ?              (in tree) show all tree keys
