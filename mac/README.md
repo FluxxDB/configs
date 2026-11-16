@@ -5,7 +5,7 @@ My Neovim, tmux, zsh and iTerm2 setup for macOS.
 | Folder | Linked to | What it is |
 |---|---|---|
 | [`nvim/`](nvim) | `~/.config/nvim` | Neovim with lazy.nvim and the Kanagawa theme |
-| [`tmux/`](tmux) | `~/.config/tmux` | tmux with an `Alt-a` prefix and a Catppuccin-colored status bar |
+| [`tmux/`](tmux) | `~/.config/tmux` | tmux with a `Cmd-a` prefix and a Catppuccin-colored status bar |
 | [`zsh/`](zsh) | `~/.zshrc`, `~/.zprofile` | Oh My Zsh with the `af-magic` prompt |
 | [`iterm2/`](iterm2) | loaded by iTerm2 | iTerm2 settings: font, colors, key bindings |
 | [`vllm/`](vllm) | — | Template for serving an MLX model with vllm-metal from `docker compose` |
@@ -75,7 +75,7 @@ pinned versions.
 
 ## tmux
 
-- Prefix is `Alt-a`
+- Prefix is `Cmd-a` (iTerm2 sends it as `Ctrl-a`); `Alt-a` works too, like on Windows
 - `prefix r` reloads the config
 - Mouse support is on, and windows and panes are numbered from 1
 - Sessions survive a reboot: [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect)
