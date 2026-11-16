@@ -78,6 +78,12 @@ pinned versions.
 - Prefix is `Alt-a`
 - `prefix r` reloads the config
 - Mouse support is on, and windows and panes are numbered from 1
+- Sessions survive a reboot: [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect)
+  and [tmux-continuum](https://github.com/tmux-plugins/tmux-continuum) save
+  sessions, windows, panes, their folders and visible text every 15 minutes,
+  and restore the last save when tmux starts. `prefix Ctrl-s` saves right away
+  and `prefix Ctrl-r` restores. `install.sh` clones both into
+  `~/.local/share/tmux/plugins`; saves go to `~/.local/share/tmux/resurrect`.
 
 ## Making changes
 

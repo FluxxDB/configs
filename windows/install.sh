@@ -31,6 +31,15 @@ link "$repo/tmux" "$config/tmux"
 link "$repo/zsh/zshrc" "$HOME/.zshrc"
 link "$repo/zsh/zprofile" "$HOME/.zprofile"
 
+# tmux plugins, cloned outside the repo; tmux.conf loads them
+plugins="$HOME/.local/share/tmux/plugins"
+for plugin in tmux-resurrect tmux-continuum; do
+  if [ ! -d "$plugins/$plugin" ]; then
+    git clone -q --depth 1 "https://github.com/tmux-plugins/$plugin" "$plugins/$plugin"
+    echo "installed       $plugins/$plugin"
+  fi
+done
+
 # tmux reads ~/.tmux.conf before ~/.config/tmux/tmux.conf, so one there would win.
 if [ -e "$HOME/.tmux.conf" ] || [ -L "$HOME/.tmux.conf" ]; then
   mv "$HOME/.tmux.conf" "$HOME/.tmux.conf.backup-$stamp"
